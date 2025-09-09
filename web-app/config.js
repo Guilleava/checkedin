@@ -1,0 +1,3 @@
+// Pega tus valores reales aquí
+window.SUPABASE_URL = https://enxuvqcjzbcmbehjwhne.supabase.co;
+window.SUPABASE_ANON_KEY = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVueHV2cWNqemJjbWJlaGp3aG5lIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTc0NTMzODgsImV4cCI6MjA3MzAyOTM4OH0.kTqbkP0kOwHvVNmbJA1e65Q9lrFRukHaOmNZNjklZfc;
