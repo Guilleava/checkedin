@@ -5,11 +5,15 @@
   async function loadVenues() {
     const sel = document.getElementById('venue');
     sel.innerHTML = '<option value="" disabled selected>Cargando…</option>';
-    const { data, error } = await supabase.from('Venue')
+    const { data, error } = await supabase.from('venue')
       .select('id,name,max_active_males,max_active_females,active')
       .eq('active', true)
       .order('created_at', { ascending: true });
-    if (error) { sel.innerHTML = '<option value="" disabled selected>Error al cargar</option>'; return []; }
+    if (error) { 
+      console.error('[loadVenues] error:', error);
+      sel.innerHTML = '<option value="" disabled selected>Error al cargar</option>'; 
+      return []; 
+    }
     sel.innerHTML = '<option value="" disabled selected>Selecciona una sede</option>';
     data.forEach(v => {
       const opt = document.createElement('option');
@@ -24,10 +28,12 @@
 
   async function capacityCheck(venueId, myGender){
     const field = myGender==='male' ? 'max_active_males' : 'max_active_females';
-    const { data: v } = await supabase.from('Venue').select(field).eq('id', venueId).single();
-    const { count } = await supabase.from('Checkins')
+    const { data: v, error: ve } = await supabase.from('venue').select(field).eq('id', venueId).single();
+    if (ve) { console.error('[capacityCheck venue]', ve); }
+    const { count, error: ce } = await supabase.from('checkins')
       .select('id', { count:'exact', head:true })
       .eq('venue_id', venueId).eq('active', true).eq('gender', myGender);
+    if (ce) { console.error('[capacityCheck checkins]', ce); }
     const max = v ? v[field] : 100;
     return (count||0) < max;
   }
@@ -40,10 +46,14 @@
     const targetGender = me.interested_in==='men' ? 'male':'female';
     const myGender = me.gender;
 
-    const { data, error } = await supabase.from('Checkins')
+    const { data, error } = await supabase.from('checkins')
       .select('nickname,instagram,gender,description,interested_in,active,created_at')
       .eq('venue_id', me.venue_id).eq('active', true).order('created_at',{ascending:false});
-    if(error){ empty.hidden=false; return; }
+    if(error){ 
+      console.error('[loadProfiles]', error);
+      empty.hidden=false; 
+      return; 
+    }
     const items = (data||[])
       .filter(p=>p.nickname!==me.nickname)
       .filter(p=>p.gender===targetGender && p.interested_in===myGender);
@@ -68,27 +78,29 @@
       sendBtn.addEventListener('click', async ()=>{
         const text = prompt(`Mensaje a ${p.nickname} (máx 150 caracteres)`);
         if(!text) return;
-        await supabase.from('Messages').insert({
+        const { error: meErr } = await supabase.from('messages').insert({
           venue_id: me.venue_id,
           from_nickname: me.nickname,
           to_nickname: p.nickname,
           text: text.trim().slice(0,150)
         });
+        if (meErr) { console.error('[send message]', meErr); alert('Error al enviar.'); return; }
         alert('Enviado.');
       });
 
       const viewBtn = document.createElement('button'); viewBtn.type='button'; viewBtn.className='outline'; viewBtn.textContent='Ver mensajes';
       viewBtn.addEventListener('click', async ()=>{
-        const { data: msgs } = await supabase.from('Messages')
+        const { data: msgs, error: vmErr } = await supabase.from('messages')
           .select('from_nickname,text,created_at,read')
           .eq('venue_id', me.venue_id)
           .eq('to_nickname', me.nickname)
           .order('created_at', { ascending:false })
           .limit(10);
+        if (vmErr) { console.error('[view messages]', vmErr); alert('No fue posible cargar mensajes.'); return; }
         if(!msgs || !msgs.length) return alert('Sin mensajes nuevos.');
         const lines = msgs.map(m=>`De ${m.from_nickname}: ${m.text}`).join('\\n');
         alert(lines);
-        await supabase.from('Messages').update({ read: true })
+        await supabase.from('messages').update({ read: true })
           .eq('venue_id', me.venue_id).eq('to_nickname', me.nickname).eq('read', false);
       });
 
@@ -132,12 +144,13 @@
       try {
         const ok = await capacityCheck(venueId, gender);
         if(!ok){ errEl.textContent='Capacidad alcanzada para tu género en esta sede. Intenta luego.'; errEl.hidden=false; return; }
-      } catch {
+      } catch (capErr) {
+        console.error('[capacityCheck]', capErr);
         errEl.textContent='No fue posible validar la capacidad. Intenta más tarde.'; errEl.hidden=false; return;
       }
 
       try {
-        const { error } = await supabase.from('Checkins').insert({
+        const { error } = await supabase.from('checkins').insert({
           venue_id: venueId,
           nickname,
           instagram: instagram||null,
@@ -148,6 +161,7 @@
         });
         if(error) throw error;
       } catch (e) {
+        console.error('[insert checkin]', e);
         errEl.textContent = e?.message || 'No fue posible registrar tu check-in.'; errEl.hidden=false; return;
       }
 
@@ -155,7 +169,7 @@
       storage.setUser(me);
       document.getElementById('checkin-section').hidden = true;
       document.getElementById('profiles-section').hidden = false;
-      meLine.textContent = `Estás como ${nickname} — ${gender==='male'?'Hombre':'Mujer'}. Interés: ${interested_in==='men'?'Hombres':'Mujeres'}.`;
+      meLine.textContent = `Estás como ${nickname} — ${gender==='male'?'Hombre':'Mujer'}. Interés: ${interesed_in==='men'?'Hombres':'Mujeres'}.`;
       await loadProfiles(me);
     });
 
@@ -167,7 +181,7 @@
     checkoutBtn.addEventListener('click', async ()=>{
       const me = storage.getUser();
       if(!me) return;
-      const { data: as } = await supabase.from('App_setting').select('min_stay_minutes').single();
+      const { data: as } = await supabase.from('app_setting').select('min_stay_minutes').single();
       const mins = as?.min_stay_minutes ?? 0;
 
       try {
@@ -175,7 +189,7 @@
         if(error) throw error;
         if(res === 'too_early'){ alert(`Aún no puedes salir. Tiempo mínimo: ${mins} minutos.`); return; }
       } catch {
-        await supabase.from('Checkins').update({ active:false })
+        await supabase.from('checkins').update({ active:false })
           .eq('venue_id', me.venue_id).eq('nickname', me.nickname).eq('active', true);
       }
 
