@@ -169,7 +169,7 @@
       storage.setUser(me);
       document.getElementById('checkin-section').hidden = true;
       document.getElementById('profiles-section').hidden = false;
-      meLine.textContent = `Estás como ${nickname} — ${gender==='male'?'Hombre':'Mujer'}. Interés: ${interesed_in==='men'?'Hombres':'Mujeres'}.`;
+      meLine.textContent = `Estás como ${nickname} — ${gender==='male'?'Hombre':'Mujer'}. Interés: ${interested_in==='men'?'Hombres':'Mujeres'}.`;
       await loadProfiles(me);
     });
 
