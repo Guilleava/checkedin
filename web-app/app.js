@@ -69,7 +69,8 @@
     // A quién debo ver (género objetivo desde mi interés)
     const targetGender = myInterest === 'men' ? 'male' : 'female';
     // Qué espera ver la otra persona para que sea mutuo (interés objetivo desde MI género)
-    const partnerMustBeInterestedIn = (myGender === 'male' ? 'women' : 'men');
+    const partnerMustBeInterestedIn = myGender === 'male' ? 'men' : 'women';
+
 
     const { data, error } = await supabase
       .from('checkins')
