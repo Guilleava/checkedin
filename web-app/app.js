@@ -2,13 +2,13 @@
 (function () {
   const storage = window.CheckedInStorage;
 
-  // --- Venues ---
+  // ---------------- Venues ----------------
   async function loadVenues() {
     const sel = document.getElementById('venue');
     sel.innerHTML = '<option value="" disabled selected>Cargando…</option>';
 
     const { data, error } = await supabase
-      .from('venue') // <-- minúsculas
+      .from('venue') // minúsculas
       .select('id,name,max_active_males,max_active_females,active')
       .eq('active', true)
       .order('created_at', { ascending: true });
@@ -31,45 +31,48 @@
     return data || [];
   }
 
-  // --- Capacidad por género/sede ---
+  // ------------- Capacidad por género/sede -------------
   async function capacityCheck(venueId, myGender) {
     const field = myGender === 'male' ? 'max_active_males' : 'max_active_females';
 
     const { data: v, error: ve } = await supabase
-      .from('venue') // <-- minúsculas
+      .from('venue')
       .select(field)
       .eq('id', venueId)
       .single();
-
     if (ve) console.error('[capacityCheck venue]', ve);
 
     const { count, error: ce } = await supabase
-      .from('checkins') // <-- minúsculas
+      .from('checkins')
       .select('id', { count: 'exact', head: true })
       .eq('venue_id', venueId)
       .eq('active', true)
       .eq('gender', myGender);
-
     if (ce) console.error('[capacityCheck checkins]', ce);
 
     const max = v ? v[field] : 100;
     return (count || 0) < max;
   }
 
-  // --- Listado de perfiles (mutuo interés) ---
+  // ------------- Listado de perfiles (interés mutuo) -------------
   async function loadProfiles(me) {
     const list = document.getElementById('profiles-list');
     const empty = document.getElementById('profiles-empty');
     list.innerHTML = '';
 
-    // normalizar para evitar fallos por mayúsculas/espacios
     const norm = s => (s || '').toLowerCase().trim();
+
+    // Mi info normalizada
     const myGender = norm(me.gender);                 // 'male' | 'female'
     const myInterest = norm(me.interested_in);        // 'men'  | 'women'
+
+    // A quién debo ver (género objetivo desde mi interés)
     const targetGender = myInterest === 'men' ? 'male' : 'female';
+    // Qué espera ver la otra persona para que sea mutuo (interés objetivo desde MI género)
+    const partnerMustBeInterestedIn = (myGender === 'male' ? 'women' : 'men');
 
     const { data, error } = await supabase
-      .from('checkins') // <-- minúsculas
+      .from('checkins')
       .select('nickname,instagram,gender,description,interested_in,active,created_at')
       .eq('venue_id', me.venue_id)
       .eq('active', true)
@@ -84,7 +87,7 @@
       return;
     }
 
-    // normalizar filas y filtrar por interés mutuo
+    // Normalizar filas y aplicar filtro de interés mutuo
     const items = (data || [])
       .map(p => ({
         ...p,
@@ -92,11 +95,16 @@
         interested_in: norm(p.interested_in),
         nickname: p.nickname
       }))
-      .filter(p => p.nickname !== me.nickname)                     // no mostrarme a mí
-      .filter(p => p.gender === targetGender && p.interested_in === myGender);
+      // no mostrarme a mí
+      .filter(p => p.nickname !== me.nickname)
+      // 1) Ellos/ellas son del género que me interesa
+      .filter(p => p.gender === targetGender)
+      // 2) Ellos/ellas están interesados en mi género
+      .filter(p => p.interested_in === partnerMustBeInterestedIn);
 
     console.log('[loadProfiles] filtered:', {
-      targetGender, myGender, itemsCount: items.length, items
+      myGender, myInterest, targetGender, partnerMustBeInterestedIn,
+      itemsCount: items.length, items
     });
 
     if (!items.length) {
@@ -106,7 +114,7 @@
     }
     empty.hidden = true;
 
-    // render
+    // Render tarjetas
     const frag = document.createDocumentFragment();
     items.forEach(p => {
       const card = document.createElement('div');
@@ -153,13 +161,12 @@
       sendBtn.addEventListener('click', async () => {
         const text = prompt(`Mensaje a ${p.nickname} (máx 150 caracteres)`);
         if (!text) return;
-        const { error: meErr } = await supabase.from('messages') // <-- minúsculas
-          .insert({
-            venue_id: me.venue_id,
-            from_nickname: me.nickname,
-            to_nickname: p.nickname,
-            text: text.trim().slice(0, 150)
-          });
+        const { error: meErr } = await supabase.from('messages').insert({
+          venue_id: me.venue_id,
+          from_nickname: me.nickname,
+          to_nickname: p.nickname,
+          text: text.trim().slice(0, 150)
+        });
         if (meErr) { console.error('[send message]', meErr); alert('Error al enviar.'); return; }
         alert('Enviado.');
       });
@@ -169,7 +176,7 @@
       viewBtn.className = 'outline';
       viewBtn.textContent = 'Ver mensajes';
       viewBtn.addEventListener('click', async () => {
-        const { data: msgs, error: vmErr } = await supabase.from('messages') // <-- minúsculas
+        const { data: msgs, error: vmErr } = await supabase.from('messages')
           .select('from_nickname,text,created_at,read')
           .eq('venue_id', me.venue_id)
           .eq('to_nickname', me.nickname)
@@ -201,7 +208,7 @@
     list.appendChild(frag);
   }
 
-  // --- App init ---
+  // ---------------- App init ----------------
   document.addEventListener('DOMContentLoaded', async () => {
     await loadVenues();
 
@@ -241,16 +248,15 @@
 
       // insertar check-in
       try {
-        const { error } = await supabase.from('checkins') // <-- minúsculas
-          .insert({
-            venue_id: venueId,
-            nickname,
-            instagram: instagram || null,
-            gender,
-            description,
-            interested_in,
-            active: true
-          });
+        const { error } = await supabase.from('checkins').insert({
+          venue_id: venueId,
+          nickname,
+          instagram: instagram || null,
+          gender,
+          description,
+          interested_in,
+          active: true
+        });
         if (error) throw error;
       } catch (e2) {
         console.error('[insert checkin]', e2);
@@ -281,7 +287,7 @@
       if (!me) return;
 
       const { data: as } = await supabase
-        .from('app_setting') // <-- minúsculas
+        .from('app_setting')
         .select('min_stay_minutes')
         .single();
       const mins = as?.min_stay_minutes ?? 0;
@@ -290,7 +296,10 @@
         const { data: res, error } = await supabase
           .rpc('checkout_by_nickname', { p_venue_id: me.venue_id, p_nickname: me.nickname });
         if (error) throw error;
-        if (res === 'too_early') { alert(`Aún no puedes salir. Tiempo mínimo: ${mins} minutos.`); return; }
+        if (res === 'too_early') {
+          alert(`Aún no puedes salir. Tiempo mínimo: ${mins} minutos.`);
+          return;
+        }
       } catch {
         // DEV fallback: permitir checkout
         await supabase.from('checkins')
