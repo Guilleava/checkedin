@@ -1,6 +1,7 @@
-// Lógica principal (SIN geolocalización). Supabase + localStorage.
+// Lógica principal (SIN geolocalización). Supabase + localStorage + Realtime de mensajes.
 (function () {
   const storage = window.CheckedInStorage;
+  let realtimeSub = null; // para limpiar la suscripción si hace falta
 
   // ---------------- Venues ----------------
   async function loadVenues() {
@@ -8,7 +9,7 @@
     sel.innerHTML = '<option value="" disabled selected>Cargando…</option>';
 
     const { data, error } = await supabase
-      .from('venue') // minúsculas
+      .from('venue')
       .select('id,name,max_active_males,max_active_females,active')
       .eq('active', true)
       .order('created_at', { ascending: true });
@@ -54,6 +55,27 @@
     return (count || 0) < max;
   }
 
+  // ------------- Realtime: aviso al recibir mensaje -------------
+  function subscribeToIncomingMessages(me) {
+    // Limpia la suscripción anterior si existe
+    if (realtimeSub) {
+      try { supabase.removeChannel(realtimeSub); } catch {}
+      realtimeSub = null;
+    }
+    // Activa Realtime en la tabla "messages" (Table Editor → messages → Enable Realtime)
+    realtimeSub = supabase
+      .channel(`msgs_${me.nickname}`)
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'messages', filter: `to_nickname=eq.${me.nickname}` },
+        (payload) => {
+          const m = payload.new;
+          alert(`Nuevo mensaje de ${m.from_nickname}: ${m.text}`);
+        }
+      )
+      .subscribe((status) => console.log('[realtime] status:', status));
+  }
+
   // ------------- Listado de perfiles (interés mutuo) -------------
   async function loadProfiles(me) {
     const list = document.getElementById('profiles-list');
@@ -63,14 +85,13 @@
     const norm = s => (s || '').toLowerCase().trim();
 
     // Mi info normalizada
-    const myGender = norm(me.gender);                 // 'male' | 'female'
-    const myInterest = norm(me.interested_in);        // 'men'  | 'women'
+    const myGender = norm(me.gender);          // 'male' | 'female'
+    const myInterest = norm(me.interested_in); // 'men'  | 'women'
 
     // A quién debo ver (género objetivo desde mi interés)
     const targetGender = myInterest === 'men' ? 'male' : 'female';
     // Qué espera ver la otra persona para que sea mutuo (interés objetivo desde MI género)
     const partnerMustBeInterestedIn = myGender === 'male' ? 'men' : 'women';
-
 
     const { data, error } = await supabase
       .from('checkins')
@@ -98,9 +119,9 @@
       }))
       // no mostrarme a mí
       .filter(p => p.nickname !== me.nickname)
-      // 1) Ellos/ellas son del género que me interesa
+      // 1) Son del género que me interesa
       .filter(p => p.gender === targetGender)
-      // 2) Ellos/ellas están interesados en mi género
+      // 2) Están interesad@s en mi género
       .filter(p => p.interested_in === partnerMustBeInterestedIn);
 
     console.log('[loadProfiles] filtered:', {
@@ -177,19 +198,22 @@
       viewBtn.className = 'outline';
       viewBtn.textContent = 'Ver mensajes';
       viewBtn.addEventListener('click', async () => {
+        // Mostrar SOLO la conversación con esta persona
         const { data: msgs, error: vmErr } = await supabase.from('messages')
           .select('from_nickname,text,created_at,read')
           .eq('venue_id', me.venue_id)
           .eq('to_nickname', me.nickname)
+          .eq('from_nickname', p.nickname)
           .order('created_at', { ascending: false })
-          .limit(10);
+          .limit(12);
         if (vmErr) { console.error('[view messages]', vmErr); alert('No fue posible cargar mensajes.'); return; }
-        if (!msgs || !msgs.length) return alert('Sin mensajes nuevos.');
+        if (!msgs || !msgs.length) return alert(`Sin mensajes de ${p.nickname}.`);
         const lines = msgs.map(m => `De ${m.from_nickname}: ${m.text}`).join('\n');
         alert(lines);
         await supabase.from('messages').update({ read: true })
           .eq('venue_id', me.venue_id)
           .eq('to_nickname', me.nickname)
+          .eq('from_nickname', p.nickname)
           .eq('read', false);
       });
 
@@ -274,6 +298,7 @@
         `Interés: ${interested_in === 'men' ? 'Hombres' : 'Mujeres'}.`;
 
       await loadProfiles(me);
+      subscribeToIncomingMessages(me); // activar realtime
     });
 
     // actualizar listado
@@ -310,6 +335,8 @@
           .eq('active', true);
       }
 
+      // Quitar realtime + limpiar sesión
+      if (realtimeSub) { try { supabase.removeChannel(realtimeSub); } catch {} }
       storage.removeUser();
       location.reload();
     });
