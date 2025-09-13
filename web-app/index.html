@@ -7,68 +7,71 @@
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
-  <main class="container">
-    <section id="checkin-section" class="card">
-      <h1>Check-in</h1>
-      <form id="checkin-form">
-        <div class="field">
-          <label for="venue">Sede <span class="req">*</span></label>
-          <select id="venue" required>
-            <option value="" disabled selected>Selecciona una sede</option>
-          </select>
-        </div>
-        <div class="field">
-          <label for="nickname">Apodo <span class="req">*</span></label>
-          <input id="nickname" type="text" maxlength="24" placeholder="ej.: GuilleV" required />
-        </div>
-        <div class="field">
-          <label for="instagram">Instagram (opcional)</label>
-          <div class="input-with-prefix">
-            <span class="prefix">@</span>
-            <input id="instagram" type="text" maxlength="32" placeholder="tu_usuario (sin @)" />
+  <!-- Scroll container to reduce pull-to-refresh -->
+  <div id="app-scroll">
+    <main class="container">
+      <section id="checkin-section" class="card">
+        <h1>Check-in</h1>
+        <form id="checkin-form">
+          <div class="field">
+            <label for="venue">Sede <span class="req">*</span></label>
+            <select id="venue" required>
+              <option value="" disabled selected>Selecciona una sede</option>
+            </select>
           </div>
-        </div>
-        <div class="field">
-          <label for="gender">Soy <span class="req">*</span></label>
-          <select id="gender" required>
-            <option value="" disabled selected>Selecciona</option>
-            <option value="male">Hombre</option>
-            <option value="female">Mujer</option>
-          </select>
-        </div>
-        <div class="field">
-          <label for="description">Descríbete hoy <span class="req">*</span></label>
-          <textarea id="description" rows="3" maxlength="180" placeholder="Ej.: Tengo el cabello rubio y llevo camisa verde y jeans azules." required></textarea>
-          <small class="hint">Usa una descripción corta para que puedan ubicarte.</small>
-        </div>
-        <div class="field">
-          <label for="interested_in">Interesad@ en conocer <span class="req">*</span></label>
-          <select id="interested_in" required>
-            <option value="" disabled selected>Selecciona</option>
-            <option value="men">Hombres</option>
-            <option value="women">Mujeres</option>
-          </select>
-        </div>
-        <button id="continue-btn" type="submit">Continuar</button>
-        <p id="checkin-error" class="error" hidden></p>
-      </form>
-    </section>
+          <div class="field">
+            <label for="nickname">Apodo <span class="req">*</span></label>
+            <input id="nickname" type="text" maxlength="24" placeholder="ej.: GuilleV" required />
+          </div>
+          <div class="field">
+            <label for="instagram">Instagram (opcional)</label>
+            <div class="input-with-prefix">
+              <span class="prefix">@</span>
+              <input id="instagram" type="text" maxlength="32" placeholder="tu_usuario (sin @)" />
+            </div>
+          </div>
+          <div class="field">
+            <label for="gender">Soy <span class="req">*</span></label>
+            <select id="gender" required>
+              <option value="" disabled selected>Selecciona</option>
+              <option value="male">Hombre</option>
+              <option value="female">Mujer</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="description">Descríbete hoy <span class="req">*</span></label>
+            <textarea id="description" rows="3" maxlength="180" placeholder="Ej.: Tengo el cabello rubio y llevo camisa verde y jeans azules." required></textarea>
+            <small class="hint">Usa una descripción corta para que puedan ubicarte.</small>
+          </div>
+          <div class="field">
+            <label for="interested_in">Interesad@ en conocer <span class="req">*</span></label>
+            <select id="interested_in" required>
+              <option value="" disabled selected>Selecciona</option>
+              <option value="men">Hombres</option>
+              <option value="women">Mujeres</option>
+            </select>
+          </div>
+          <button id="continue-btn" type="submit">Continuar</button>
+          <p id="checkin-error" class="error" hidden></p>
+        </form>
+      </section>
 
-    <section id="profiles-section" hidden>
-      <header class="profiles-header">
-        <div>
-          <h2>Personas aquí ahora</h2>
-          <p id="me-line" class="muted"></p>
-        </div>
-        <div class="actions">
-          <button id="refresh-btn" type="button" class="outline">Actualizar</button>
-          <button id="checkout-btn" type="button">Salir</button>
-        </div>
-      </header>
-      <div id="profiles-list" class="cards"></div>
-      <p id="profiles-empty" class="muted" hidden>No hay personas que coincidan con tu interés.</p>
-    </section>
-  </main>
+      <section id="profiles-section" hidden>
+        <header class="profiles-header">
+          <div>
+            <h2>Personas aquí ahora</h2>
+            <p id="me-line" class="muted"></p>
+          </div>
+          <div class="actions">
+            <button id="refresh-btn" type="button" class="outline">Actualizar</button>
+            <button id="checkout-btn" type="button">Salir</button>
+          </div>
+        </header>
+        <div id="profiles-list" class="cards"></div>
+        <p id="profiles-empty" class="muted" hidden>No hay personas que coincidan con tu interés.</p>
+      </section>
+    </main>
+  </div>
 
   <!-- Supabase CDN -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
