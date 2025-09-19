@@ -1,10 +1,13 @@
 (function () {
   const storage = window.CheckedInStorage;
 
+  // ---- Config ----
+  const MESSAGE_LIMIT = 3;
+
   // Realtime channels
-  let msgSub = null;          // messages channel (was realtimeSub)
-  let checkinsSub = null;     // new: checkins realtime channel
-  let autoRefreshTimer = null; // new: polling fallback
+  let msgSub = null;           // messages channel
+  let checkinsSub = null;      // checkins realtime channel
+  let autoRefreshTimer = null; // polling fallback
 
   // ---------- helpers to manage auto refresh ----------
   function stopAutoRefresh() {
@@ -63,6 +66,24 @@
       .subscribe();
   }
 
+  // ---------- Message limit helpers ----------
+  async function getSentCount(me, toNickname) {
+    const { count, error } = await supabase
+      .from('messages')
+      .select('id', { count: 'exact', head: true })
+      .eq('venue_id', me.venue_id)
+      .eq('from_nickname', me.nickname)
+      .eq('to_nickname', toNickname);
+    if (error) { console.error('[getSentCount]', error); return 0; }
+    return count || 0;
+  }
+
+  async function getQuota(me, toNickname) {
+    const used = await getSentCount(me, toNickname);
+    const left = Math.max(0, MESSAGE_LIMIT - used);
+    return { used, left };
+  }
+
   // ---------- Profiles (mutual interest) ----------
   async function loadProfiles(me) {
     const list = document.getElementById('profiles-list');
@@ -92,7 +113,9 @@
     empty.hidden = true;
 
     const frag = document.createDocumentFragment();
-    items.forEach(p => {
+
+    // Build cards with per-conversation quota
+    await Promise.all(items.map(async (p) => {
       const card = document.createElement('div'); card.className = 'card'; card.style.display = 'flex';
       const avatar = document.createElement('div'); avatar.className = 'avatar'; avatar.textContent = p.nickname[0].toUpperCase();
       const body = document.createElement('div'); body.style.flex = '1';
@@ -110,11 +133,49 @@
 
       const actions = document.createElement('div'); actions.className = 'actions';
 
+      // Quota display
+      const quota = document.createElement('span');
+      quota.className = 'muted';
+      quota.style.marginRight = '8px';
+
+      // Buttons
       const sendBtn = document.createElement('button');
       sendBtn.textContent = 'Enviar mensaje';
+
+      const viewBtn = document.createElement('button');
+      viewBtn.className = 'outline';
+      viewBtn.textContent = 'Ver mensajes';
+
+      // Evaluate current quota for this conversation
+      let { used, left } = await getQuota(me, p.nickname);
+
+      function renderQuota() {
+        quota.textContent =
+          left > 0
+            ? `Te quedan ${left} mensajes con ${p.nickname}`
+            : 'Te has quedado sin mensajes. Es momento de verificar con quién hablas: asegúrate de que es la persona correcta, haz contacto visual y/o saluda.';
+        sendBtn.disabled = left <= 0;
+        if (left <= 0) {
+          sendBtn.title = 'Has alcanzado el límite de mensajes para esta persona';
+        } else {
+          sendBtn.removeAttribute('title');
+        }
+      }
+      renderQuota();
+
+      // Send flow with server-side recheck
       sendBtn.onclick = async () => {
-        const text = prompt(`Mensaje a ${p.nickname}`);
+        // Recheck to avoid race conditions
+        ({ left } = await getQuota(me, p.nickname));
+        if (left <= 0) {
+          renderQuota();
+          alert('Te has quedado sin mensajes. Es momento de verificar con quién hablas: asegúrate de que es la persona correcta, haz contacto visual y/o saluda.');
+          return;
+        }
+
+        const text = prompt(`Mensaje a ${p.nickname} (máx 150 caracteres)`);
         if (!text) return;
+
         const { error: meErr } = await supabase.from('messages').insert({
           venue_id: me.venue_id,
           from_nickname: me.nickname,
@@ -122,12 +183,19 @@
           text: text.trim().slice(0, 150)
         });
         if (meErr) { alert('Error al enviar'); return; }
-        alert('Enviado.');
+
+        used += 1;
+        left = Math.max(0, MESSAGE_LIMIT - used);
+        renderQuota();
+
+        if (left <= 0) {
+          alert('Te has quedado sin mensajes. Es momento de verificar con quién hablas: asegúrate de que es la persona correcta, haz contacto visual y/o saluda.');
+        } else {
+          alert('Enviado.');
+        }
       };
 
-      const viewBtn = document.createElement('button');
-      viewBtn.className = 'outline';
-      viewBtn.textContent = 'Ver mensajes';
+      // View messages (this conversation only)
       viewBtn.onclick = async () => {
         const { data: msgs, error: vmErr } = await supabase.from('messages')
           .select('from_nickname,text,created_at')
@@ -141,11 +209,21 @@
         alert(msgs.map(m => `De ${m.from_nickname}: ${m.text}`).join('\n'));
       };
 
-      actions.appendChild(sendBtn); actions.appendChild(viewBtn);
-      body.appendChild(title); body.appendChild(meta); body.appendChild(desc); body.appendChild(links); body.appendChild(actions);
-      card.appendChild(avatar); card.appendChild(body);
+      actions.appendChild(quota);
+      actions.appendChild(sendBtn);
+      actions.appendChild(viewBtn);
+
+      body.appendChild(title);
+      body.appendChild(meta);
+      body.appendChild(desc);
+      body.appendChild(links);
+      body.appendChild(actions);
+
+      card.appendChild(avatar);
+      card.appendChild(body);
       frag.appendChild(card);
-    });
+    }));
+
     list.appendChild(frag);
   }
 
@@ -168,7 +246,7 @@
 
     await loadProfiles(me);
     subscribeToIncomingMessages(me);
-    startAutoRefresh(me); // NEW: keep list live
+    startAutoRefresh(me); // keep list live
     return true;
   }
 
@@ -233,7 +311,7 @@
 
       await loadProfiles(me);
       subscribeToIncomingMessages(me);
-      startAutoRefresh(me); // NEW: start live updates after check-in
+      startAutoRefresh(me); // start live updates after check-in
     });
 
     // Manual refresh (kept)
