@@ -2,7 +2,7 @@
   const storage = window.CheckedInStorage;
 
   // ---- Config ----
-  const MESSAGE_LIMIT = 3;
+  const MESSAGE_LIMIT = 10;
 
   // Realtime channels
   let msgSub = null;           // messages channel
