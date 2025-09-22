@@ -153,7 +153,7 @@
         quota.textContent =
           left > 0
             ? `Te quedan ${left} mensajes con ${p.nickname}`
-            : 'Te has quedado sin mensajes. Es momento de verificar con quién hablas: asegúrate de que es la persona correcta, haz contacto visual y/o saluda.';
+            : '¡No más mensajes! Ahora comprueba que hablas con quien crees: haz contacto visual, saluda o acércate.';
         sendBtn.disabled = left <= 0;
         if (left <= 0) {
           sendBtn.title = 'Has alcanzado el límite de mensajes para esta persona';
@@ -169,7 +169,7 @@
         ({ left } = await getQuota(me, p.nickname));
         if (left <= 0) {
           renderQuota();
-          alert('Te has quedado sin mensajes. Es momento de verificar con quién hablas: asegúrate de que es la persona correcta, haz contacto visual y/o saluda.');
+          alert('¡No más mensajes! Ahora comprueba que hablas con quien crees: haz contacto visual, saluda o acércate.');
           return;
         }
 
@@ -189,7 +189,7 @@
         renderQuota();
 
         if (left <= 0) {
-          alert('Te has quedado sin mensajes. Es momento de verificar con quién hablas: asegúrate de que es la persona correcta, haz contacto visual y/o saluda.');
+          alert('¡No más mensajes! Ahora comprueba que hablas con quien crees: haz contacto visual, saluda o acércate.');
         } else {
           alert('Enviado.');
         }
